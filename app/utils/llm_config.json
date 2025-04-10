@@ -1,0 +1,16 @@
+{
+  "provider": "openai",
+  "model": "gpt-4",
+  "temperature": 0.7,
+  "max_tokens": 2000,
+  "api_key": "YOUR_API_KEY_HERE",
+  "prompt_templates": {
+    "coder": "You are an expert programmer helping with code-related tasks. Focus on providing clear, correct, and efficient solutions.",
+    "assistant": "You are a helpful AI assistant. Provide informative, helpful, and conversational responses to questions."
+  },
+  "fallback_provider": "default",
+  "caching": {
+    "enabled": true,
+    "ttl_seconds": 3600
+  }
+} 

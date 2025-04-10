@@ -1,0 +1,28 @@
+{
+  "supported_languages": [
+    "Python",
+    "JavaScript",
+    "HTML",
+    "CSS",
+    "Java",
+    "C++",
+    "C#",
+    "TypeScript",
+    "PHP",
+    "Ruby",
+    "Go"
+  ],
+  "llm_settings": {
+    "model": "default",
+    "temperature": 0.3,
+    "max_tokens": 2000
+  },
+  "capabilities": [
+    "Code generation",
+    "Bug fixing",
+    "Refactoring",
+    "Code explanation",
+    "Best practices",
+    "Design patterns"
+  ]
+} 
