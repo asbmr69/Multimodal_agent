@@ -42,7 +42,7 @@ def call_llm(prompt: str, use_cache: bool = True) -> str:
     
     # Call the LLM if not in cache or cache disabled
     client = Anthropic(
-        api_key="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"
+        api_key=""
     )
     response = client.messages.create(
         model="claude-3-7-sonnet-20250219",
