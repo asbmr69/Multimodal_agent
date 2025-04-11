@@ -7,6 +7,7 @@ from typing import List, Dict, Any, Tuple
 
 # Import utility functions
 from ..agent_utils.call_llm import call_llm
+from ..agent_utils.create_file import create_file
 from ..agent_utils.read_file import read_file
 from ..agent_utils.delete_file import delete_file
 from ..agent_utils.replace_file import replace_file
@@ -14,7 +15,7 @@ from ..agent_utils.search_ops import grep_search
 from ..agent_utils.dir_ops import list_dir
 
 # Import base agent and LLM integration
-from ..base_agent import BaseAgent
+#from ..base_agent import BaseAgent
 from ..agent_utils.llm_integration import get_llm_provider
 
 # Set up logging
@@ -187,8 +188,21 @@ Available tools:
      params:
        relative_workspace_path: utils
    - Result: Returns a tree visualization of the directory structure
-
-6. finish: End the process and provide final response
+6. create_file: Create a new file or directory
+   - Parameters: 
+       target_file: path to create
+       content: content to write (optional, empty for directories)
+   - Example:
+     tool: create_file
+     reason: I need to create a new configuration file
+     params:
+       target_file: config/settings.json
+       content: |
+         {{
+           "debug": true,
+           "port": 8080
+         }}
+7. finish: End the process and provide final response
    - No parameters required
    - Example:
      tool: finish
@@ -403,6 +417,52 @@ class ListDirAction(Node):
                 "tree_visualization": tree_str
             }
 
+#############################################
+# Create File Action Node
+#############################################
+class CreateFileAction(Node):
+    def prep(self, shared: Dict[str, Any]) -> Dict[str, Any]:
+        # Get parameters from the last history entry
+        history = shared.get("history", [])
+        if not history:
+            raise ValueError("No history found")
+        
+        last_action = history[-1]
+        params = last_action["params"]
+        
+        if "target_file" not in params:
+            raise ValueError("Missing target_file parameter")
+        
+        # Get the content parameter (empty string if not provided)
+        content = params.get("content", "")
+        
+        # Ensure path is relative to working directory
+        working_dir = shared.get("working_dir", "")
+        target_file = params["target_file"]
+        full_path = os.path.join(working_dir, target_file) if working_dir else target_file
+        
+        return {
+            "target_file": full_path,
+            "content": content
+        }
+    
+    def exec(self, params: Dict[str, Any]) -> Tuple[str, bool]:
+        # Call create_file utility
+        return create_file(
+            target_file=params["target_file"],
+            content=params["content"]
+        )
+    
+    def post(self, shared: Dict[str, Any], prep_res: Dict[str, Any], exec_res: Tuple[str, bool]) -> None:
+        message, success = exec_res
+        
+        # Update the result in the last history entry
+        history = shared.get("history", [])
+        if history:
+            history[-1]["result"] = {
+                "success": success,
+                "message": message
+            }
 #############################################
 # Delete File Action Node
 #############################################
@@ -764,6 +824,7 @@ def create_main_flow() -> Flow:
     read_action = ReadFileAction()
     grep_action = GrepSearchAction()
     list_dir_action = ListDirAction()
+    create_file = CreateFileAction()
     delete_action = DeleteFileAction()
     edit_agent = create_edit_agent()
     format_response = FormatResponseNode()
@@ -772,6 +833,7 @@ def create_main_flow() -> Flow:
     main_agent - "read_file" >> read_action
     main_agent - "grep_search" >> grep_action
     main_agent - "list_dir" >> list_dir_action
+    main_agent - "create_file" >> create_file
     main_agent - "delete_file" >> delete_action
     main_agent - "edit_file" >> edit_agent
     main_agent - "finish" >> format_response
@@ -780,6 +842,7 @@ def create_main_flow() -> Flow:
     read_action >> main_agent
     grep_action >> main_agent
     list_dir_action >> main_agent
+    create_file >> main_agent
     delete_action >> main_agent
     edit_agent >> main_agent
     
@@ -789,98 +852,96 @@ def create_main_flow() -> Flow:
 # Create the main flow
 coding_agent_flow = create_main_flow()
 
-class CoderAgent(BaseAgent):
-    """
-    Coder Agent implementation that helps with code-related tasks
-    """
+# # class CoderAgent(BaseAgent):
+#     """
+#     Coder Agent implementation that helps with code-related tasks
+#     """
     
-    def __init__(self):
-        super().__init__(
-            name="Coder",
-            description="AI Agent that helps with coding, debugging, and software development tasks"
-        )
-        self.load_config()
+#     def __init__(self):
+#         super().__init__(
+#             name="Coder",
+#             description="AI Agent that helps with coding, debugging, and software development tasks"
+#         )
+#         self.load_config()
         
-        # Additional initialization specific to the coder agent
-        self.supported_languages = self.config.get('supported_languages', [
-            "Python", "JavaScript", "HTML", "CSS", "Java", "C++", "C#"
-        ])
+#         # Additional initialization specific to the coder agent
+#         self.supported_languages = self.config.get('supported_languages', [
+#             "Python", "JavaScript", "HTML", "CSS", "Java", "C++", "C#"
+#         ])
         
-        # Initialize LLM provider
-        provider_name = self.config.get('llm_settings', {}).get('provider', 'default')
-        self.llm_provider = get_llm_provider(provider_name)
+#         # Initialize LLM provider
         
-        # Get system prompt template
-        config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
-                                  'utils', 'llm_config.json')
-        self.system_prompt = get_llm_provider(config_path=config_path).config.get('prompt_templates', {}).get('coder', 
-            "You are an expert programmer helping with code-related tasks. Focus on providing clear, correct, and efficient solutions."
-        )
+#         # Get system prompt template
+#         config_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 
+#                                   'utils', 'llm_config.json')
+#         self.system_prompt = get_llm_provider(config_path=config_path).config.get('prompt_templates', {}).get('coder', 
+#             "You are an expert programmer helping with code-related tasks. Focus on providing clear, correct, and efficient solutions."
+#         )
         
-    def process(self, query, context=None):
-        """
-        Process a coding-related query
+#     def process(self, query, context=None):
+#         """
+#         Process a coding-related query
         
-        Args:
-            query (str): The user's coding question or request
-            context (dict, optional): Additional context like current file, selected code, etc.
+#         Args:
+#             query (str): The user's coding question or request
+#             context (dict, optional): Additional context like current file, selected code, etc.
             
-        Returns:
-            str: The agent's response with code, explanations, or troubleshooting
-        """
-        if not context:
-            context = {}
+#         Returns:
+#             str: The agent's response with code, explanations, or troubleshooting
+#         """
+#         if not context:
+#             context = {}
             
-        # Extract useful context
-        current_file = context.get('current_file', '')
-        selected_code = context.get('selected_code', '')
-        conversation_history = context.get('conversation_history', [])
+#         # Extract useful context
+#         current_file = context.get('current_file', '')
+#         selected_code = context.get('selected_code', '')
+#         conversation_history = context.get('conversation_history', [])
         
-        # Format conversation history for the LLM
-        formatted_history = []
-        for message in conversation_history:
-            if len(formatted_history) >= 10:  # Limit history to prevent token overload
-                break
-            if message.get('role') in ['user', 'agent']:
-                formatted_history.append({
-                    "role": "user" if message.get('role') == 'user' else "assistant",
-                    "content": message.get('content', '')
-                })
+#         # Format conversation history for the LLM
+#         formatted_history = []
+#         for message in conversation_history:
+#             if len(formatted_history) >= 10:  # Limit history to prevent token overload
+#                 break
+#             if message.get('role') in ['user', 'agent']:
+#                 formatted_history.append({
+#                     "role": "user" if message.get('role') == 'user' else "assistant",
+#                     "content": message.get('content', '')
+#                 })
         
-        # Enhance the query with context if available
-        enhanced_query = query
-        if current_file:
-            enhanced_query += f"\n\nContext - Current file: {current_file}"
-        if selected_code:
-            enhanced_query += f"\n\nSelected code:\n```\n{selected_code}\n```"
+#         # Enhance the query with context if available
+#         enhanced_query = query
+#         if current_file:
+#             enhanced_query += f"\n\nContext - Current file: {current_file}"
+#         if selected_code:
+#             enhanced_query += f"\n\nSelected code:\n```\n{selected_code}\n```"
             
-        # Get LLM settings
-        llm_settings = self.config.get('llm_settings', {})
-        model = llm_settings.get('model', 'default')
-        temperature = llm_settings.get('temperature', 0.3)
-        max_tokens = llm_settings.get('max_tokens', 2000)
+#         # Get LLM settings
+#         llm_settings = self.config.get('llm_settings', {})
+#         model = llm_settings.get('model', 'default')
+#         temperature = llm_settings.get('temperature', 0.3)
+#         max_tokens = llm_settings.get('max_tokens', 2000)
             
-        # Get response from LLM
-        try:
-            response = self.llm_provider.generate_response(
-                prompt=enhanced_query,
-                system_message=self.system_prompt,
-                context=formatted_history,
-                model=model,
-                temperature=temperature,
-                max_tokens=max_tokens
-            )
-            return response
-        except Exception as e:
-            # Fallback to basic responses if LLM fails
-            print(f"LLM error: {str(e)}")
+#         # Get response from LLM
+#         try:
+#             response = self.llm_provider.generate_response(
+#                 prompt=enhanced_query,
+#                 system_message=self.system_prompt,
+#                 context=formatted_history,
+#                 model=model,
+#                 temperature=temperature,
+#                 max_tokens=max_tokens
+#             )
+#             return response
+#         except Exception as e:
+#             # Fallback to basic responses if LLM fails
+#             print(f"LLM error: {str(e)}")
             
-            # Simple fallback logic
-            if "write" in query.lower() and "function" in query.lower():
-                return f"Here's a sample function based on your request:\n\n```python\ndef sample_function():\n    # TODO: Implement the requested functionality\n    pass\n```\n\nYou can customize this function to meet your specific requirements."
-            elif "debug" in query.lower() or "error" in query.lower():
-                return f"To debug the issue, let's analyze what might be causing the problem. Common issues include:\n\n1. Syntax errors\n2. Logic errors\n3. Runtime exceptions\n\nCould you share the specific error message you're seeing?"
-            elif "explain" in query.lower():
-                return f"I'd be happy to explain the concept. Here's a breakdown of how it works...\n\nDid you want me to go into more depth on any particular aspect?"
-            else:
-                return f"I'm your Coder Agent. I can help with programming tasks, debugging, code optimization, and software development. How can I assist with your coding needs today?\n\nYou asked: '{query}'"
+#             # Simple fallback logic
+#             if "write" in query.lower() and "function" in query.lower():
+#                 return f"Here's a sample function based on your request:\n\n```python\ndef sample_function():\n    # TODO: Implement the requested functionality\n    pass\n```\n\nYou can customize this function to meet your specific requirements."
+#             elif "debug" in query.lower() or "error" in query.lower():
+#                 return f"To debug the issue, let's analyze what might be causing the problem. Common issues include:\n\n1. Syntax errors\n2. Logic errors\n3. Runtime exceptions\n\nCould you share the specific error message you're seeing?"
+#             elif "explain" in query.lower():
+#                 return f"I'd be happy to explain the concept. Here's a breakdown of how it works...\n\nDid you want me to go into more depth on any particular aspect?"
+#             else:
+#                 return f"I'm your Coder Agent. I can help with programming tasks, debugging, code optimization, and software development. How can I assist with your coding needs today?\n\nYou asked: '{query}'"

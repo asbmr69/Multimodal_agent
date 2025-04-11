@@ -10,7 +10,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Multimodal AI Agent")
-        self.setMinimumSize(1200, 800)
+        self.setMinimumSize(1430, 800)
         
         # Main widget and layout
         self.central_widget = QWidget()
@@ -33,8 +33,19 @@ class MainWindow(QMainWindow):
         self.chat_section = ChatSection()
         self.splitter.addWidget(self.chat_section)
         
-        # Set initial sizes (10% file explorer, 60% code editor, 30% chat)
-        self.splitter.setSizes([100, 700, 300])
+        # Set initial sizes and constraints for sections
+        self.splitter.setSizes([100, 750, 250])
+        
+        # Set minimum and maximum widths for sections
+        self.file_explorer.setMinimumWidth(100)
+        self.file_explorer.setMaximumWidth(300)
+        self.chat_section.setMinimumWidth(200)
+        self.chat_section.setMaximumWidth(400)
+        
+        # Set stretch factors to allow code editor to expand
+        self.splitter.setStretchFactor(0, 0)  # File explorer - no stretch
+        self.splitter.setStretchFactor(1, 1)  # Code editor - stretch
+        self.splitter.setStretchFactor(2, 0)  # Chat section - no stretch
         
         # Status bar
         self.status_bar = QStatusBar()
@@ -47,4 +58,4 @@ class MainWindow(QMainWindow):
     def open_file(self, file_path):
         """Open a file in the code editor when selected in file explorer"""
         self.code_editor.set_file(file_path)
-        self.status_bar.showMessage(f"Opened: {file_path}") 
+        self.status_bar.showMessage(f"Opened: {file_path}")

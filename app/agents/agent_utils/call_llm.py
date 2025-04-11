@@ -42,19 +42,19 @@ def call_llm(prompt: str, use_cache: bool = True) -> str:
     
     # Call the LLM if not in cache or cache disabled
     client = Anthropic(
-        api_key="your_api_key"
+        api_key="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"
     )
     response = client.messages.create(
-        model="claude-3.7-sonnet",
-        max_tokens=20000,
-        thinking={
-            "type": "enabled",
-            "budget_tokens": 2000
-        },
+        model="claude-3-7-sonnet-20250219",
+        max_tokens=4096,
+        # thinking={
+        #     "type": "enabled",
+        #     "budget_tokens": 2000
+        # },
         messages=[{"role": "user", "content": prompt}]
         
     )
-    response_text = response.content[1].text
+    response_text = response.content[0].text
 
     # from ollama import chat
     # response = chat(
