@@ -1,63 +1,3 @@
-import json
-import os
-import openai
-
-class AssistantAgent:
-    def __init__(self):
-        self.name = "Assistant Agent"
-        self.description = "General purpose AI assistant that can answer questions and provide information"
-        self.context = []
-        
-        # Load configuration if available
-        config_path = os.path.join(os.path.dirname(__file__), "assistant_config.json")
-        if os.path.exists(config_path):
-            with open(config_path, "r") as f:
-                self.config = json.load(f)
-        else:
-            self.config = {
-                "model": "gpt-3.5-turbo",
-                "temperature": 0.7,
-                "max_tokens": 1000
-            }
-    
-    def get_response(self, message):
-        """Generate a response to the user's message"""
-        try:
-            # Add the message to context
-            self.context.append({"role": "user", "content": message})
-            
-            # Prepare the messages for the API call
-            messages = [
-                {"role": "system", "content": "You are a helpful assistant. Provide clear, concise, and accurate information."},
-            ]
-            
-            # Add context (limited to last 10 messages to avoid token limits)
-            messages.extend(self.context[-10:])
-            
-            # Call the OpenAI API
-            response = openai.chat.completions.create(
-                model=self.config["model"],
-                messages=messages,
-                temperature=self.config["temperature"],
-                max_tokens=self.config["max_tokens"]
-            )
-            
-            # Extract the response text
-            response_text = response.choices[0].message.content
-            
-            # Add the response to context
-            self.context.append({"role": "assistant", "content": response_text})
-            
-            return response_text
-        except Exception as e:
-            return f"Error generating response: {str(e)}"
-    
-    def clear_context(self):
-        """Clear the conversation context"""
-        self.context = []
-
-# Create a singleton instance
-assistant_agent = AssistantAgent()
 
 
 
@@ -99,7 +39,7 @@ from google import genai
 
 # Set your API key
 load_dotenv()
-API_KEY = "AIzaSyCsfxwn8e-qmRSkSHe5V6p2XXgGYLMLIB8"
+API_KEY = "api_key"
 # API_KEY = # set api key here
 if not API_KEY:
     raise ValueError("GEMINI_API_KEY is not set. Please add it to .env file.")
@@ -107,11 +47,69 @@ client = genai.Client(api_key=API_KEY, http_options={"api_version": "v1alpha"})
 
 # While Gemini 2.0 Flash is in experimental preview mode, only one of AUDIO or
 # TEXT may be passed here.
-# CONFIG = {"generation_config": {"response_modalities": ["AUDIO"]}}
 CONFIG = {}
+# CONFIG = {}
 
 
 pya = pyaudio.PyAudio()
+
+
+class AssistantAgent:
+    def __init__(self):
+        self.context = []
+        self.audio_loop = None
+        
+    def get_response(self, message):
+        """Get a response from the assistant agent"""
+        # Use Gemini API to get a response
+        try:
+            model = genai.GenerativeModel(MODEL, config=CONFIG)
+            response = model.generate_content(message)
+            return response.text
+        except Exception as e:
+            print(f"Error getting response from Gemini API: {e}")
+            return f"I'm sorry, I encountered an error: {str(e)}"
+    
+    def clear_context(self):
+        """Clear the conversation context"""
+        self.context = []
+        
+    def start_audio_visual_mode(self, video_mode="camera"):
+        """Start the audio/visual interaction mode"""
+        self.audio_loop = AudioLoop(video_mode=video_mode)
+        
+        # Create a new thread to run the asyncio event loop
+        import threading
+        import asyncio
+        
+        def run_async_loop():
+            # Create a new event loop for this thread
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                # Run the audio loop in this thread's event loop
+                loop.run_until_complete(self.audio_loop.run())
+            except Exception as e:
+                print(f"Error in audio loop: {e}")
+            finally:
+                loop.close()
+        
+        # Start the thread
+        self.audio_thread = threading.Thread(target=run_async_loop, daemon=True)
+        self.audio_thread.start()
+        return self.audio_thread
+    
+    def stop_audio_visual_mode(self):
+        """Stop the audio/visual interaction mode"""
+        if self.audio_loop and hasattr(self.audio_loop, 'audio_stream') and self.audio_loop.audio_stream:
+            self.audio_loop.audio_stream.close()
+            
+        # Cancel the running asyncio tasks by raising an exception
+        if hasattr(self, 'audio_thread') and self.audio_thread.is_alive():
+            # We don't need to explicitly join the thread as it's a daemon thread
+            # It will be terminated when the main program exits
+            print("Audio thread is being terminated")
+            # The thread will exit when the audio_stream is closed
 
 
 class AudioLoop:
@@ -122,7 +120,7 @@ class AudioLoop:
         self.out_queue = None
 
         self.session = None
-
+        self.audio_stream = None
         self.send_text_task = None
         self.receive_audio_task = None
         self.play_audio_task = None

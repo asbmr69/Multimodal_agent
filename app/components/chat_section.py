@@ -290,6 +290,28 @@ class ChatSection(QWidget):
         self.message_input.returnPressed.connect(self.send_message)
         self.input_layout.addWidget(self.message_input, 1)  # Give it a stretch factor of 1
         
+        # Microphone button for audio/visual interaction
+        self.mic_button = QPushButton()
+        self.mic_button.setToolTip("Start audio/visual interaction")
+        self.mic_button.setFixedSize(40, 40)
+        self.mic_button.setText("🎤")
+        self.mic_button.setStyleSheet(
+            "QPushButton { background-color: #00C853; color: white; border-radius: 20px; }"
+            "QPushButton:hover { background-color: #00E676; }"
+            "QPushButton:checked { background-color: #FF5252; }"
+        )
+        self.mic_button.setCheckable(True)
+        self.mic_button.clicked.connect(self.toggle_audio_visual_mode)
+        self.input_layout.addWidget(self.mic_button)
+        
+        # Volume indicator (hidden by default)
+        self.volume_indicator = QLabel()
+        self.volume_indicator.setFixedSize(20, 40)
+        self.volume_indicator.setStyleSheet("color: #FF5252; font-weight: bold;")
+        self.volume_indicator.setText("🔊")
+        self.volume_indicator.setVisible(False)
+        self.input_layout.addWidget(self.volume_indicator)
+        
         # Send button with icon
         self.send_button = QPushButton()
         self.send_button.setToolTip("Send message")
@@ -341,7 +363,7 @@ class ChatSection(QWidget):
             # Initialize shared memory for coder agent flow
             shared = {
                 "user_query": message,
-                "working_dir": os.getcwd(),
+                "working_dir": "./project",
                 "history": [],
                 "response": None
             }
@@ -409,3 +431,38 @@ class ChatSection(QWidget):
         
         # Add a new welcome message
         self.add_ai_message("Chat cleared. How can I help you today?", "Assistant Agent")
+        
+    def toggle_audio_visual_mode(self):
+        """Toggle audio/visual interaction mode"""
+        if self.mic_button.isChecked():
+            # Update microphone button appearance
+            self.mic_button.setToolTip("Stop audio/visual interaction")
+            self.mic_button.setText("🔴")
+            
+            # Show volume indicator
+            self.volume_indicator.setVisible(True)
+            
+            # Start audio/visual mode with screen capture directly
+            self.add_ai_message("Starting audio/visual interaction mode with screen capture. I can now see and hear you. My responses will be spoken aloud.", "Assistant Agent")
+            
+            # Disable text input while in audio/visual mode
+            self.message_input.setEnabled(False)
+            self.send_button.setEnabled(False)
+            
+            # Start the audio/visual mode with screen capture mode
+            self.audio_visual_task = self.assistant_agent.start_audio_visual_mode(video_mode="screen")
+        else:
+            # Update microphone button appearance
+            self.mic_button.setToolTip("Start audio/visual interaction")
+            self.mic_button.setText("🎤")
+            
+            # Hide volume indicator
+            self.volume_indicator.setVisible(False)
+            
+            # Stop audio/visual mode
+            self.add_ai_message("Audio/visual interaction mode stopped.", "Assistant Agent")
+            # Re-enable text input
+            self.message_input.setEnabled(True)
+            self.send_button.setEnabled(True)
+            # Stop the audio/visual mode
+            self.assistant_agent.stop_audio_visual_mode()
